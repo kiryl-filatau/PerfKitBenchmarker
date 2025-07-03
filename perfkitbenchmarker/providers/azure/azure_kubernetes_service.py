@@ -420,9 +420,12 @@ class AksAutomaticCluster(AksCluster):
         '--tier', 'standard',
     ]
 
-     # Add Kubernetes version if specified
-    if FLAGS.azure_aks_cluster_version:
-      cmd.extend(['--kubernetes-version', FLAGS.azure_aks_cluster_version])
+    vm_util.Retry(timeout=300)(vm_util.IssueCommand)(
+        cmd,
+        # Half hour timeout on creating the cluster.
+        timeout=1800,
+    )
+
 
 def _AzureNodePoolName(pkb_nodepool_name: str) -> str:
   """Truncate nodepool name for AKS."""
