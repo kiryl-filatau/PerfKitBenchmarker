@@ -391,7 +391,38 @@ class AksCluster(container_service.KubernetesCluster):
     stdout, _, _ = vm_util.IssueCommand(cmd)
     nodepools = json.loads(stdout)
     return [nodepool['name'] for nodepool in nodepools]
+  
+class AksAutomaticCluster(AksCluster):
+  """Class representing an AKS Automatic cluster, which has managed node pools."""
 
+  CLOUD = provider_info.AZURE
+  CLUSTER_TYPE = 'Auto'
+
+  def __init__(self, spec):
+    """Initializes the cluster."""
+    super().__init__(spec)
+
+  def _Create(self):
+    """Creates the Automatic AKS cluster."""
+    cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'create',
+         '--name',
+        self.name,
+        '--location',
+        self.region,
+         '--ssh-key-value',
+        vm_util.GetPublicKeyPath(),
+        '--resource-group',
+        self.resource_group.name,
+        '--sku', 'automatic',
+        '--tier', 'standard',
+    ]
+
+     # Add Kubernetes version if specified
+    if FLAGS.azure_aks_cluster_version:
+      cmd.extend(['--kubernetes-version', FLAGS.azure_aks_cluster_version])
 
 def _AzureNodePoolName(pkb_nodepool_name: str) -> str:
   """Truncate nodepool name for AKS."""
