@@ -404,7 +404,9 @@ class AksAutomaticCluster(AksCluster):
     super().__init__(spec)
 
   def _Create(self):
-    """Creates the Automatic AKS cluster."""
+    """Creates the Automatic AKS cluster with tags."""
+    tags_dict = util.GetResourceTags(self.resource_group.timeout_minutes)
+    tags_list = [f'{k}={v}' for k, v in tags_dict.items()]
     cmd = [
         azure.AZURE_PATH,
         'aks',
@@ -417,9 +419,10 @@ class AksAutomaticCluster(AksCluster):
         vm_util.GetPublicKeyPath(),
         '--resource-group',
         self.resource_group.name,
-        '--sku', 'automatic',
-    ]
-
+        '--sku',
+        'automatic',
+        '--tags',
+    ] + tags_list
     vm_util.Retry(timeout=300)(vm_util.IssueCommand)(
         cmd,
         # Half hour timeout on creating the cluster.
@@ -472,20 +475,7 @@ class AksAutomaticCluster(AksCluster):
     return 'default' in stdout
   
   def _PostCreate(self):
-    """Tags the AKS cluster resource (not the node resource group)."""
-    tags_dict = util.GetResourceTags(self.resource_group.timeout_minutes)
-    tags_list = [f'{k}={v}' for k, v in tags_dict.items()]
-    set_tags_cmd = [
-        azure.AZURE_PATH,
-        'aks',
-        'update',
-        '--resource-group',
-        self.resource_group.name,
-        '--name',
-        self.name,
-        '--tags',
-    ] + tags_list
-    vm_util.IssueCommand(set_tags_cmd)
+    pass
 
 
 def _AzureNodePoolName(pkb_nodepool_name: str) -> str:
