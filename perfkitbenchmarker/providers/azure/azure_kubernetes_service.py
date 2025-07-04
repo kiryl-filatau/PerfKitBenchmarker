@@ -456,18 +456,19 @@ class AksAutomaticCluster(AksCluster):
     return 'default' in stdout
   
   def _PostCreate(self):
-    """Tags the cluster resource group."""
-    super()._PostCreate()
-    # Only tag the main resource group, not the node resource group
+    """Tags the AKS cluster resource (not the node resource group)."""
+    tags_dict = util.GetTagsJson(self.resource_group.timeout_minutes)
+    tags_list = [f'{k}={v}' for k, v in tags_dict.items()]
     set_tags_cmd = [
         azure.AZURE_PATH,
-        'group',
+        'aks',
         'update',
-        '-g',
+        '--resource-group',
         self.resource_group.name,
-        '--set',
-        'tags={}'.format(util.GetTagsJson(self.resource_group.timeout_minutes)),
-    ]
+        '--name',
+        self.name,
+        '--tags',
+    ] + tags_list
     vm_util.IssueCommand(set_tags_cmd)
 
 
