@@ -394,6 +394,7 @@ class AksCluster(container_service.KubernetesCluster):
   
 class AksAutomaticCluster(AksCluster):
   """Class representing an AKS Automatic cluster, which has managed node pools."""
+  # https://learn.microsoft.com/en-us/azure/aks/automatic/quick-automatic-managed-network
 
   CLOUD = provider_info.AZURE
   CLUSTER_TYPE = 'Auto'
@@ -408,17 +409,15 @@ class AksAutomaticCluster(AksCluster):
         azure.AZURE_PATH,
         'aks',
         'create',
-         '--name',
+        '--name',
         self.name,
         '--location',
         self.region,
-         '--ssh-key-value',
+        '--ssh-key-value',
         vm_util.GetPublicKeyPath(),
         '--resource-group',
         self.resource_group.name,
         '--sku', 'automatic',
-        '--tier', 'standard',
-        '--enable-azure-monitor-metrics',
     ]
 
     vm_util.Retry(timeout=300)(vm_util.IssueCommand)(
@@ -426,6 +425,35 @@ class AksAutomaticCluster(AksCluster):
         # Half hour timeout on creating the cluster.
         timeout=1800,
     )
+
+  def _IsReady(self):
+    """Returns True if the cluster is ready."""
+    vm_util.IssueCommand(
+        [
+            azure.AZURE_PATH,
+            'aks',
+            'get-credentials',
+            '--name',
+            self.name,
+            '--file',
+            FLAGS.kubeconfig,
+        ]
+        + self.resource_group.args
+    )
+    version_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig, 'version']
+    _, _, retcode = vm_util.IssueCommand(version_cmd, raise_on_failure=False)
+    if retcode:
+      return False
+    # POD creation will fail until the default service account is created.
+    get_cmd = [
+        FLAGS.kubectl,
+        '--kubeconfig',
+        FLAGS.kubeconfig,
+        'get',
+        'serviceAccounts',
+    ]
+    stdout, _, _ = vm_util.IssueCommand(get_cmd)
+    return 'default' in stdout
 
 
 def _AzureNodePoolName(pkb_nodepool_name: str) -> str:
