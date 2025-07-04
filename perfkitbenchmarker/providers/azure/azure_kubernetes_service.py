@@ -428,6 +428,22 @@ class AksAutomaticCluster(AksCluster):
 
   def _IsReady(self):
     """Returns True if the cluster is ready."""
+    # Check provisioning state
+    show_cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'show',
+        '--name',
+        self.name,
+    ] + self.resource_group.args
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
+    try:
+        cluster = json.loads(stdout)
+        if cluster.get('provisioningState') != 'Succeeded':
+            return False
+    except Exception:
+        return False
+
     vm_util.IssueCommand(
         [
             azure.AZURE_PATH,
@@ -457,7 +473,7 @@ class AksAutomaticCluster(AksCluster):
   
   def _PostCreate(self):
     """Tags the AKS cluster resource (not the node resource group)."""
-    tags_dict = util.GetTagsJson(self.resource_group.timeout_minutes)
+    tags_dict = util.GetResourceTags(self.resource_group.timeout_minutes)
     tags_list = [f'{k}={v}' for k, v in tags_dict.items()]
     set_tags_cmd = [
         azure.AZURE_PATH,
