@@ -418,6 +418,7 @@ class AksAutomaticCluster(AksCluster):
         self.resource_group.name,
         '--sku', 'automatic',
         '--tier', 'standard',
+        '--enable-azure-monitor-metrics',
     ]
 
     vm_util.Retry(timeout=300)(vm_util.IssueCommand)(
