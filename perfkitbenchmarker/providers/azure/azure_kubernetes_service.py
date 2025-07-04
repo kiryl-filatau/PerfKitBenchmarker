@@ -454,6 +454,22 @@ class AksAutomaticCluster(AksCluster):
     ]
     stdout, _, _ = vm_util.IssueCommand(get_cmd)
     return 'default' in stdout
+  
+  def _PostCreate(self):
+    """Tags the cluster resource group."""
+    super()._PostCreate()
+    set_tags_cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'update',
+        '--resource-group',
+        self.node_resource_group,
+        '--name',
+        self.name,
+        '--tags'
+        util.GetTagsJson(self.resource_group.timeout_minutes),
+    ]
+    vm_util.IssueCommand(set_tags_cmd)
 
 
 def _AzureNodePoolName(pkb_nodepool_name: str) -> str:
