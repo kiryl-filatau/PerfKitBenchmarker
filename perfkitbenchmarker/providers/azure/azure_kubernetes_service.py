@@ -423,7 +423,7 @@ class AksAutomaticCluster(AksCluster):
         'automatic',
         '--tags',
     ] + tags_list
-    vm_util.Retry(timeout=300)(vm_util.IssueCommand)(
+    vm_util.IssueCommand(
         cmd,
         # Half hour timeout on creating the cluster.
         timeout=1800,
@@ -432,20 +432,23 @@ class AksAutomaticCluster(AksCluster):
   def _IsReady(self):
     """Returns True if the cluster is ready."""
     # Check provisioning state
-    show_cmd = [
-        azure.AZURE_PATH,
-        'aks',
-        'show',
-        '--name',
-        self.name,
-    ] + self.resource_group.args
-    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
-    try:
-        cluster = json.loads(stdout)
-        if cluster.get('provisioningState') != 'Succeeded':
-            return False
-    except Exception:
-        return False
+    vm_util.IssueCommand(
+        [
+          azure.AZURE_PATH,
+          'aks',
+          'show',
+          '--name',
+          self.name,
+        ]
+        + self.resource_group.args
+    )
+    # stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
+    # try:
+    #     cluster = json.loads(stdout)
+    #     if cluster.get('provisioningState') != 'Succeeded':
+    #         return False
+    # except Exception:
+    #     return False
 
     vm_util.IssueCommand(
         [
@@ -474,6 +477,47 @@ class AksAutomaticCluster(AksCluster):
     stdout, _, _ = vm_util.IssueCommand(get_cmd)
     return 'default' in stdout
   
+  def _CreateDependencies(self):
+    """Creates the resource group, service principal, and registers required AKS features."""
+    super()._CreateDependencies()
+
+    # Register the AutomaticSKUPreview feature
+    vm_util.IssueCommand(
+        [
+          azure.AZURE_PATH,
+          'feature',
+          'register',
+          '--namespace',
+          'Microsoft.ContainerService',
+          '--name',
+          'AutomaticSKUPreview',
+        ]
+    )
+
+    # Show the feature registration status
+    vm_util.IssueCommand(
+        [
+          azure.AZURE_PATH,
+          'feature',
+          'show',
+          '--namespace',
+          'Microsoft.ContainerService',
+          '--name',
+          'AutomaticSKUPreview',
+        ]
+    )
+    
+    # Register the provider
+    vm_util.IssueCommand(
+        [
+          azure.AZURE_PATH,
+          'provider',
+          'register',
+          '--namespace',
+          'Microsoft.ContainerService',
+        ]
+    )
+
   def _PostCreate(self):
     pass
 
