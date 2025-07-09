@@ -320,6 +320,22 @@ class AksCluster(container_service.KubernetesCluster):
     ]
     vm_util.IssueCommand(set_tags_cmd)
 
+    # Check if the container registry exists and attach to cluster
+    if hasattr(self, 'container_registry') and self.container_registry:
+      if self.container_registry._Exists():
+          attach_acr_cmd = [
+              azure.AZURE_PATH,
+              'aks',
+              'update',
+              '--name',
+              self.name,
+              '--resource-group',
+              self.resource_group.name,
+              '--attach-acr',
+              self.container_registry.name,
+          ]
+          vm_util.IssueCommand(attach_acr_cmd)
+
   def _IsReady(self):
     """Returns True if the cluster is ready."""
     vm_util.IssueCommand(
@@ -355,21 +371,6 @@ class AksCluster(container_service.KubernetesCluster):
     self.resource_group.Create()
     self.service_principal.Create()
 
-    if hasattr(self, 'container_registry') and self.container_registry:
-        if self.container_registry._Exists():
-            attach_acr_cmd = [
-                azure.AZURE_PATH,
-                'aks',
-                'update',
-                '--name',
-                self.name,
-                '--resource-group',
-                self.resource_group.name,
-                '--attach-acr',
-                self.container_registry.name,
-            ]
-            vm_util.IssueCommand(attach_acr_cmd)
-  
   def _DeleteDependencies(self):
     """Deletes the resource group."""
     self.service_principal.Delete()
