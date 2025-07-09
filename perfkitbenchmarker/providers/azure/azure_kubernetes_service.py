@@ -148,11 +148,6 @@ class AksCluster(container_service.KubernetesCluster):
     self.cluster_version = FLAGS.container_cluster_version
     self._deleted = False
 
-    if hasattr(spec, 'container_registry_spec'):
-        self.container_registry = AzureContainerRegistry(spec.container_registry_spec)
-    else:
-        self.container_registry = None
-
   def InitializeNodePoolForCloud(
       self,
       vm_config: virtual_machine.BaseVirtualMachine,
@@ -320,22 +315,6 @@ class AksCluster(container_service.KubernetesCluster):
     ]
     vm_util.IssueCommand(set_tags_cmd)
 
-    # Check if the container registry exists and attach to cluster
-    if hasattr(self, 'container_registry') and self.container_registry:
-      if self.container_registry._Exists():
-          attach_acr_cmd = [
-              azure.AZURE_PATH,
-              'aks',
-              'update',
-              '--name',
-              self.name,
-              '--resource-group',
-              self.resource_group.name,
-              '--attach-acr',
-              self.container_registry.name,
-          ]
-          vm_util.IssueCommand(attach_acr_cmd)
-
   def _IsReady(self):
     """Returns True if the cluster is ready."""
     vm_util.IssueCommand(
@@ -414,8 +393,13 @@ class AksCluster(container_service.KubernetesCluster):
     return [nodepool['name'] for nodepool in nodepools]
   
 class AksAutomaticCluster(AksCluster):
-  """Class representing an AKS Automatic cluster, which has managed node pools."""
-  # https://learn.microsoft.com/en-us/azure/aks/automatic/quick-automatic-managed-network
+  """Class representing an AKS Automatic cluster, which has managed node pools.
+  
+  This feature is currently in preview. To provision an AKS Automatic cluster, 
+  you'll need to install the Azure CLI 'aks-preview' extension.
+  For more details, see the official documentation:
+  https://learn.microsoft.com/en-us/azure/aks/automatic/quick-automatic-managed-network
+  """
 
   CLOUD = provider_info.AZURE
   CLUSTER_TYPE = 'Auto'
@@ -453,23 +437,21 @@ class AksAutomaticCluster(AksCluster):
   def _IsReady(self):
     """Returns True if the cluster is ready."""
     # Check provisioning state
-    vm_util.IssueCommand(
-        [
+    show_cmd = [
           azure.AZURE_PATH,
           'aks',
           'show',
           '--name',
           self.name,
-        ]
-        + self.resource_group.args
-    )
-    # stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
-    # try:
-    #     cluster = json.loads(stdout)
-    #     if cluster.get('provisioningState') != 'Succeeded':
-    #         return False
-    # except Exception:
-    #     return False
+        ] + self.resource_group.args
+    
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
+    try:
+        cluster = json.loads(stdout)
+        if cluster.get('provisioningState') not in ('Succeeded', 'Updating'):
+            return False
+    except Exception:
+        return False
 
     vm_util.IssueCommand(
         [
