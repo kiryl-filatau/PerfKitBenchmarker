@@ -148,6 +148,11 @@ class AksCluster(container_service.KubernetesCluster):
     self.cluster_version = FLAGS.container_cluster_version
     self._deleted = False
 
+    if hasattr(spec, 'container_registry_spec'):
+        self.container_registry = AzureContainerRegistry(spec.container_registry_spec)
+    else:
+        self.container_registry = None
+
   def InitializeNodePoolForCloud(
       self,
       vm_config: virtual_machine.BaseVirtualMachine,
@@ -350,6 +355,21 @@ class AksCluster(container_service.KubernetesCluster):
     self.resource_group.Create()
     self.service_principal.Create()
 
+    if hasattr(self, 'container_registry') and self.container_registry:
+        if self.container_registry._Exists():
+            attach_acr_cmd = [
+                azure.AZURE_PATH,
+                'aks',
+                'update',
+                '--name',
+                self.name,
+                '--resource-group',
+                self.resource_group.name,
+                '--attach-acr',
+                self.container_registry.name,
+            ]
+            vm_util.IssueCommand(attach_acr_cmd)
+  
   def _DeleteDependencies(self):
     """Deletes the resource group."""
     self.service_principal.Delete()
