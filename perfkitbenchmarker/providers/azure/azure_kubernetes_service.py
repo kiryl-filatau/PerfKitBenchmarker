@@ -321,9 +321,8 @@ class AksCluster(container_service.KubernetesCluster):
     ]
     vm_util.IssueCommand(set_tags_cmd)
 
-    print(f"self.container_registry: {self.container_registry}, "
-    f"self.container_registry._Exists(): "
-    f"{self.container_registry._Exists() if self.container_registry else 'N/A'}")
+    acr = AzureContainerRegistry(self.name)
+    print(f"ACR: {acr}")
     if self.container_registry:
         attach_acr_cmd = [
             azure.AZURE_PATH,
