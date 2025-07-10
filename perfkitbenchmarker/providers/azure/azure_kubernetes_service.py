@@ -147,8 +147,11 @@ class AksCluster(container_service.KubernetesCluster):
     self.service_principal = service_principal.ServicePrincipal.GetInstance()
     self.cluster_version = FLAGS.container_cluster_version
     self._deleted = False
+    
+    print(f"spec attributes: {dir(spec)}")
+    print(f"spec.container_registry_spec: {getattr(spec, 'container_registry_spec', None)}")
     self.container_registry = None
-    if hasattr(spec, 'container_registry_spec'):
+    if hasattr(spec, 'container_registry_spec') and getattr(spec, 'container_registry_spec') is not None:
         self.container_registry = AzureContainerRegistry(spec.container_registry_spec)
 
   def InitializeNodePoolForCloud(
