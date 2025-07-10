@@ -147,6 +147,9 @@ class AksCluster(container_service.KubernetesCluster):
     self.service_principal = service_principal.ServicePrincipal.GetInstance()
     self.cluster_version = FLAGS.container_cluster_version
     self._deleted = False
+    self.container_registry = None
+    if hasattr(spec, 'container_registry_spec'):
+        self.container_registry = AzureContainerRegistry(spec.container_registry_spec)
 
   def InitializeNodePoolForCloud(
       self,
@@ -314,6 +317,23 @@ class AksCluster(container_service.KubernetesCluster):
         util.GetTagsJson(self.resource_group.timeout_minutes),
     ]
     vm_util.IssueCommand(set_tags_cmd)
+
+    print(f"self.container_registry: {self.container_registry}, "
+    f"self.container_registry._Exists(): "
+    f"{self.container_registry._Exists() if self.container_registry else 'N/A'}")
+    if self.container_registry:
+        attach_acr_cmd = [
+            azure.AZURE_PATH,
+            'aks',
+            'update',
+            '--name',
+            self.name,
+            '--resource-group',
+            self.resource_group.name,
+            '--attach-acr',
+            self.container_registry.acr_id,
+        ]
+        vm_util.IssueCommand(attach_acr_cmd)
 
   def _IsReady(self):
     """Returns True if the cluster is ready."""
