@@ -135,7 +135,7 @@ class AksCluster(container_service.KubernetesCluster):
 
   CLOUD = provider_info.AZURE
 
-  def __init__(self, spec):
+  def __init__(self, spec, container_registry=None):
     """Initializes the cluster."""
     super().__init__(spec)
     self.region = util.GetRegionFromZone(self.zone)
