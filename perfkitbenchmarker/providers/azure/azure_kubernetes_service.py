@@ -147,7 +147,7 @@ class AksCluster(container_service.KubernetesCluster):
     self.service_principal = service_principal.ServicePrincipal.GetInstance()
     self.cluster_version = FLAGS.container_cluster_version
     self._deleted = False
-    self.container_registry_name = spec.container_registry.name
+    self.container_registry_name = spec.container_registry_name
 
   def InitializeNodePoolForCloud(
       self,
