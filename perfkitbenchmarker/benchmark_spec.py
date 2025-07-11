@@ -364,37 +364,20 @@ class BenchmarkSpec:
     self.resources.append(self.container_registry)
 
   def SetContainerRegistry(self):
-    """Fetches the Container Registry name after it is constructed.
-
-    This function ensures that the 'container_registry' attribute is defined,
-    not `None`, and has a valid 'name' attribute.
-
-    Raises:
-        ValueError: If the container registry does not exist, is not initialized, 
-                    or lacks the necessary 'name' attribute.
+    """Sets the container registry name by constructing the registry.
+    
+    Called from ConstructContainerCluster to ensure registry exists
+    and get its name.
     """
-    # Check if the 'container_registry' attribute exists
-    if hasattr(self, 'container_registry'):
-        if self.container_registry:
-            # Attempt to fetch the 'name' attribute of the container registry
-            registry_name = getattr(self.container_registry, 'name', None)
-            if registry_name:
-                # Save the registry name for later use
-                self.container_registry_name = registry_name
-                logging.info(f"Container Registry is set: {self.container_registry_name}")
-            else:
-                logging.error(
-                    f"ContainerRegistry object exists but lacks a valid 'name': {self.container_registry}"
-                )
-                raise ValueError("ContainerRegistry exists but lacks a valid 'name' attribute.")
-        else:
-            logging.error("ContainerRegistry exists but is not initialized (value is None).")
-            raise ValueError("ContainerRegistry was created but not initialized.")
+    if not hasattr(self, 'container_registry'):
+        self.container_registry = self.ConstructContainerRegistry()
+    
+    if self.container_registry:
+        self.container_registry_name = self.container_registry.name
+        logging.info('Container registry name: %s', self.container_registry_name)
     else:
-        logging.error(
-            f"ContainerRegistry attribute is missing. Attributes available in self: {dir(self)}"
-        )
-        print("The last else fired!")
+        self.container_registry_name = None
+        logging.warning('No container registry constructed')
 
   def ConstructDpbService(self):
     """Create the dpb_service object and create groups for its vms."""
