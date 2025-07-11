@@ -326,7 +326,10 @@ class BenchmarkSpec:
     """Create the container cluster."""
     if self.config.container_cluster is None:
       return
-    self.container_registry_name = self.SetContainerRegistry()
+    self.SetContainerRegistry()
+    if hasattr(self, 'container_registry') and self.container_registry:
+      self.resources.append(self.container_registry_name)
+
     cloud = self.config.container_cluster.cloud
     cluster_type = self.config.container_cluster.type
     providers.LoadProvider(cloud)
