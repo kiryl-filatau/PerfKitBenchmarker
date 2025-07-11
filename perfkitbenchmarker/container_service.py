@@ -604,8 +604,6 @@ class BaseContainerCluster(resource.BaseResource):
     if self.container_registry:
         metadata['container_registry'] = self.container_registry
 
-    logging.info('BaseContainerCluster Metadata: %s', metadata)
-
     return metadata
 
   def DeployContainer(self, name, container_spec):

@@ -328,10 +328,6 @@ class BenchmarkSpec:
       return
     if self.config.container_cluster is None:
         return
-    # self.container_registry
-    # if hasattr(self, 'container_registry') and self.container_registry:
-    #   self.resources.append(self.container_registry.name)
-    #   logging.info(f"Appended container registry to resources: {self.container_registry.name}")
 
     cloud = self.config.container_cluster.cloud
     cluster_type = self.config.container_cluster.type
@@ -345,18 +341,6 @@ class BenchmarkSpec:
     )
     self.resources.append(self.container_registry)
     self.resources.append(self.container_cluster)
-
-    print("All attributes of ConstructContainerCluster(self):")
-    for attr in dir(self):
-        # Avoid callable methods and internal attributes
-        if not attr.startswith('__') and not callable(getattr(self, attr)):
-            value = getattr(self, attr)
-            print(f"{attr}: {value}")
-    
-    # raise ValueError('End of ConstructContainerCluster')
-    # logging.info(f"Appended container cluster to resources: {self.container_cluster.name}")
-
-    # logging.info(f"All ConstructContainerCluster Resources: {self.resources}")
 
   def ConstructCluster(self):
     """Create the cluster."""
