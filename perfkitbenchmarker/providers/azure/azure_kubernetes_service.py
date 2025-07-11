@@ -315,7 +315,7 @@ class AksCluster(container_service.KubernetesCluster):
     ]
     vm_util.IssueCommand(set_tags_cmd)
 
-    print('Container registry name: %s', self.container_registry_name)
+    print(f"Container registry name: {self.container_registry_name}")
     if hasattr(self, 'container_registry_name') and self.container_registry_name:
         print(
             f"Attaching container registry '{self.container_registry_name}' "
@@ -333,6 +333,8 @@ class AksCluster(container_service.KubernetesCluster):
             self.container_registry_name,
         ]
         vm_util.IssueCommand(attach_registry_cmd)
+    else:
+        print("No container registry name defined, skipping registry attachment.")
 
   def _IsReady(self):
     """Returns True if the cluster is ready."""
