@@ -365,16 +365,20 @@ class BenchmarkSpec:
 
   def SetContainerRegistry(self):
     """Fetches the Container Registry name after it is constructed."""
+    # Check if container_registry is defined
     if hasattr(self, 'container_registry') and self.container_registry:
-        # Check if the registry has a name attribute and fetch it
+        # Attempt to fetch the name of the container registry
         registry_name = getattr(self.container_registry, 'name', None)
         if registry_name:
             self.container_registry_name = registry_name
             logging.info(f"Container Registry is set: {self.container_registry_name}")
         else:
+            # Registry exists but lacks a valid name property
             raise ValueError("ContainerRegistry exists but lacks a valid 'name' attribute.")
     else:
-        raise ValueError("ContainerRegistry has not been constructed or initialized.")
+        # ContainerRegistry attribute was not initialized
+        logging.error("ContainerRegistry was not constructed or initialized.")
+        raise ValueError("ContainerRegistry was not constructed or initialized.")
 
   def ConstructDpbService(self):
     """Create the dpb_service object and create groups for its vms."""
