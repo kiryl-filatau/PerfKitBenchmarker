@@ -295,6 +295,7 @@ class BenchmarkSpec:
     """Constructs the resources for the benchmark."""
     # Container Registry needs to go first, because it might be attched to cluster
     self.ConstructContainerRegistry()
+    self.SetContainerRegistry()
     self.ConstructContainerCluster()
     # dpb service needs to go first, because it adds some vms.
     self.ConstructDpbService()
