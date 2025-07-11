@@ -331,6 +331,8 @@ class BenchmarkSpec:
       self.resources.append(self.container_registry.name)
       logging.info(f"Appended container registry to resources: {self.container_registry.name}")
 
+    logging.info(f"All ConstructContainerCluster resources: {self}")
+
     cloud = self.config.container_cluster.cloud
     cluster_type = self.config.container_cluster.type
     providers.LoadProvider(cloud)

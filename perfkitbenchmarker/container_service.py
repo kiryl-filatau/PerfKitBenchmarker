@@ -506,7 +506,7 @@ class BaseContainerCluster(resource.BaseResource):
     )
     self.services: dict[str, KubernetesContainerService] = {}
     self._extra_samples: list[sample.Sample] = []
-    self.container_registry_name = None
+    self.container_registry_name = getattr(cluster_spec, 'container_registry_name', None)
 
   @property
   def num_nodes(self) -> int:
