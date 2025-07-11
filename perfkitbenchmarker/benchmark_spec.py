@@ -326,6 +326,7 @@ class BenchmarkSpec:
     """Create the container cluster."""
     if self.config.container_cluster is None:
       return
+    self.SetContainerRegistry()
     cloud = self.config.container_cluster.cloud
     cluster_type = self.config.container_cluster.type
     providers.LoadProvider(cloud)
@@ -352,7 +353,6 @@ class BenchmarkSpec:
     """Create the container registry."""
     if self.config.container_registry is None:
       return
-    self.SetContainerRegistry()
     cloud = self.config.container_registry.cloud
     providers.LoadProvider(cloud)
     container_registry_class = container_service.GetContainerRegistryClass(
