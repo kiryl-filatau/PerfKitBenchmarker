@@ -369,11 +369,12 @@ class BenchmarkSpec:
     Called from ConstructContainerCluster to ensure registry exists
     and get its name.
     """
+    self.container_registry = self.ConstructContainerRegistry()
     logging.info('Begin: Container registry: %s', self.container_registry)
 
-    if hasattr(self, 'container_registry'):
-        self.container_registry = self.ConstructContainerRegistry()
-        logging.info('1stIF: Container registry: %s', self.container_registry)
+    # if hasattr(self, 'container_registry'):
+    #     self.container_registry = self.ConstructContainerRegistry()
+    #     logging.info('1stIF: Container registry: %s', self.container_registry)
     
     if self.container_registry:
         self.container_registry_name = self.container_registry.name
