@@ -328,7 +328,7 @@ class BenchmarkSpec:
       return
     self.SetContainerRegistry()
     if hasattr(self, 'container_registry') and self.container_registry:
-      self.resources.append(self.container_registry)
+      self.resources.append(self.container_registry_name)
       logging.info(f"Appended container registry to resources: {self.container_registry.name}")
 
     cloud = self.config.container_cluster.cloud
