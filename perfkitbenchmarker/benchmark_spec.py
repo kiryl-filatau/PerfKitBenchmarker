@@ -364,20 +364,37 @@ class BenchmarkSpec:
     self.resources.append(self.container_registry)
 
   def SetContainerRegistry(self):
-    """Fetches the Container Registry name after it is constructed."""
-    container_registry = getattr(self, 'container_registry', None)
-    
-    if container_registry:
-        registry_name = getattr(container_registry, 'name', None)
-        if registry_name:
-            self.container_registry_name = registry_name
-            logging.info(f"Container Registry is set: {self.container_registry_name}")
+    """Fetches the Container Registry name after it is constructed.
+
+    This function ensures that the 'container_registry' attribute is defined,
+    not `None`, and has a valid 'name' attribute.
+
+    Raises:
+        ValueError: If the container registry does not exist, is not initialized, 
+                    or lacks the necessary 'name' attribute.
+    """
+    # Check if the 'container_registry' attribute exists
+    if hasattr(self, 'container_registry'):
+        if self.container_registry:
+            # Attempt to fetch the 'name' attribute of the container registry
+            registry_name = getattr(self.container_registry, 'name', None)
+            if registry_name:
+                # Save the registry name for later use
+                self.container_registry_name = registry_name
+                logging.info(f"Container Registry is set: {self.container_registry_name}")
+            else:
+                logging.error(
+                    f"ContainerRegistry object exists but lacks a valid 'name': {self.container_registry}"
+                )
+                raise ValueError("ContainerRegistry exists but lacks a valid 'name' attribute.")
         else:
-            raise ValueError("ContainerRegistry exists but lacks a valid 'name' attribute.")
+            logging.error("ContainerRegistry exists but is not initialized (value is None).")
+            raise ValueError("ContainerRegistry was created but not initialized.")
     else:
-        # Logging for easier debugging
-        logging.error(f"ContainerRegistry was not constructed. Attributes available in self: {dir(self)}")
-        print(f"ACR : {container_registry}")
+        logging.error(
+            f"ContainerRegistry attribute is missing. Attributes available in self: {dir(self)}"
+        )
+        print("The last else fired!")
 
   def ConstructDpbService(self):
     """Create the dpb_service object and create groups for its vms."""
