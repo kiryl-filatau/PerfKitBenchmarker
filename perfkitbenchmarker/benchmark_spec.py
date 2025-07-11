@@ -364,12 +364,7 @@ class BenchmarkSpec:
     self.resources.append(self.container_registry)
 
   def SetContainerRegistry(self):
-    """Sets the container registry name by constructing the registry.
-    
-    Called from ConstructContainerCluster to ensure registry exists
-    and get its name.
-    """
-    logging.info('Begin: Container registry: %s', self.container_registry)
+    """Sets the constructed container registry name."""
 
     if not hasattr(self, 'container_registry'):
         self.container_registry = self.ConstructContainerRegistry()
@@ -381,7 +376,6 @@ class BenchmarkSpec:
     else:
         self.container_registry_name = None
         logging.warning('No container registry constructed')
-        raise ValueError('No container registry constructed')
 
   def ConstructDpbService(self):
     """Create the dpb_service object and create groups for its vms."""

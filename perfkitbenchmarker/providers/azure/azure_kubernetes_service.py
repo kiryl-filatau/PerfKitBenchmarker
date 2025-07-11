@@ -315,8 +315,13 @@ class AksCluster(container_service.KubernetesCluster):
     ]
     vm_util.IssueCommand(set_tags_cmd)
 
+    print('Container registry name: %s', self.container_registry_name)
     if hasattr(self, 'container_registry_name') and self.container_registry_name:
-        attach_acr_cmd = [
+        print(
+            f"Attaching container registry '{self.container_registry_name}' "
+            f"to AKS cluster '{self.name}'."
+        )
+        attach_registry_cmd = [
             azure.AZURE_PATH,
             'aks',
             'update',
@@ -327,7 +332,7 @@ class AksCluster(container_service.KubernetesCluster):
             '--attach-acr',
             self.container_registry_name,
         ]
-        vm_util.IssueCommand(attach_acr_cmd)
+        vm_util.IssueCommand(attach_registry_cmd)
 
   def _IsReady(self):
     """Returns True if the cluster is ready."""
