@@ -315,6 +315,20 @@ class AksCluster(container_service.KubernetesCluster):
     ]
     vm_util.IssueCommand(set_tags_cmd)
 
+    if hasattr(self, 'container_registry_name') and self.container_registry_name:
+        attach_acr_cmd = [
+            azure.AZURE_PATH,
+            'aks',
+            'update',
+            '--name',
+            self.name,
+            '--resource-group',
+            self.resource_group.name,
+            '--attach-acr',
+            self.container_registry_name,
+        ]
+        vm_util.IssueCommand(attach_acr_cmd)
+
   def _IsReady(self):
     """Returns True if the cluster is ready."""
     vm_util.IssueCommand(

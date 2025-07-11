@@ -223,6 +223,8 @@ class AzureStorageAccount(resource.BaseResource):
             self.kind,
             '--name',
             self.name,
+            "--allow-blob-public-access",
+            'false',
             '--tags',
         ]
         + util.GetTags(self.resource_group.timeout_minutes)

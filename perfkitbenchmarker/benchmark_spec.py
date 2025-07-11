@@ -293,8 +293,9 @@ class BenchmarkSpec:
 
   def ConstructResources(self):
     """Constructs the resources for the benchmark."""
-    self.ConstructContainerCluster()
+    # Container Registry needs to go first, because it might be attched to cluster
     self.ConstructContainerRegistry()
+    self.ConstructContainerCluster()
     # dpb service needs to go first, because it adds some vms.
     self.ConstructDpbService()
     self.ConstructCluster()
@@ -351,6 +352,7 @@ class BenchmarkSpec:
     """Create the container registry."""
     if self.config.container_registry is None:
       return
+    self.SetContainerRegistry()
     cloud = self.config.container_registry.cloud
     providers.LoadProvider(cloud)
     container_registry_class = container_service.GetContainerRegistryClass(
@@ -360,6 +362,19 @@ class BenchmarkSpec:
         self.config.container_registry
     )
     self.resources.append(self.container_registry)
+
+  def SetContainerRegistry(self):
+    """Fetches the Container Registry name after it is constructed."""
+    if hasattr(self, 'container_registry') and self.container_registry:
+        # Check if the registry has a name attribute and fetch it
+        registry_name = getattr(self.container_registry, 'name', None)
+        if registry_name:
+            self.container_registry_name = registry_name
+            logging.info(f"Container Registry is set: {self.container_registry_name}")
+        else:
+            raise ValueError("ContainerRegistry exists but lacks a valid 'name' attribute.")
+    else:
+        raise ValueError("ContainerRegistry has not been constructed or initialized.")
 
   def ConstructDpbService(self):
     """Create the dpb_service object and create groups for its vms."""
