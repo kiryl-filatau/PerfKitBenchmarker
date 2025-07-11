@@ -349,7 +349,7 @@ class BenchmarkSpec:
             value = getattr(self, attr)
             print(f"{attr}: {value}")
     
-    raise ValueError('End of ConstructContainerCluster')
+    # raise ValueError('End of ConstructContainerCluster')
     # logging.info(f"Appended container cluster to resources: {self.container_cluster.name}")
 
     # logging.info(f"All ConstructContainerCluster Resources: {self.resources}")
