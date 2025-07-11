@@ -343,6 +343,8 @@ class BenchmarkSpec:
     self.resources.append(self.container_cluster)
     logging.info(f"Appended container cluster to resources: {self.container_cluster.name}")
 
+    logging.info(f"All ConstructContainerCluster Resources: {self.resources}")
+
   def ConstructCluster(self):
     """Create the cluster."""
     if self.config.cluster is None:
