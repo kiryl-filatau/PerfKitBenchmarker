@@ -373,6 +373,7 @@ class BenchmarkSpec:
 
     if not hasattr(self, 'container_registry'):
         self.container_registry = self.ConstructContainerRegistry()
+        logging.info('1stIF: Container registry: %s', self.container_registry)
     
     if self.container_registry:
         self.container_registry_name = self.container_registry.name
