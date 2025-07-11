@@ -328,7 +328,8 @@ class BenchmarkSpec:
       return
     self.SetContainerRegistry()
     if hasattr(self, 'container_registry') and self.container_registry:
-      self.resources.append(self.container_registry_name)
+      self.resources.append(self.container_registry)
+      logging.info(f"Appended container registry to resources: {self.container_registry.name}")
 
     cloud = self.config.container_cluster.cloud
     cluster_type = self.config.container_cluster.type
@@ -340,6 +341,7 @@ class BenchmarkSpec:
         self.config.container_cluster
     )
     self.resources.append(self.container_cluster)
+    logging.info(f"Appended container cluster to resources: {self.container_cluster.name}")
 
   def ConstructCluster(self):
     """Create the cluster."""
