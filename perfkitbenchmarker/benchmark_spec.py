@@ -326,7 +326,7 @@ class BenchmarkSpec:
     """Create the container cluster."""
     if self.config.container_cluster is None:
       return
-    self.SetContainerRegistry()
+    self.container_registry
     # if hasattr(self, 'container_registry') and self.container_registry:
     #   self.resources.append(self.container_registry_name)
     #   logging.info(f"Appended container registry to resources: {self.container_registry.name}")
