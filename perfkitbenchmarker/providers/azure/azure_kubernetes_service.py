@@ -323,11 +323,12 @@ class AksCluster(container_service.KubernetesCluster):
             value = getattr(self, attr)
             print(f"{attr}: {value}")
 
-    if hasattr(self, 'container_registry_name') and self.container_registry_name:
-      print(
-          f"Attaching container registry '{self.container_registry_name}' "
-          f"to AKS cluster '{self.name}'."
-      )
+    if hasattr(self, 'container_registry') and self.container_registry:
+      # print(
+      #     f"Attaching container registry '{self.container_registry_name}' "
+      #     f"to AKS cluster '{self.name}'."
+      # )
+      print(f'!_container_registry_name_!: {self.container_registry.name}')
       attach_registry_cmd = [
           azure.AZURE_PATH,
           'aks',
@@ -337,7 +338,7 @@ class AksCluster(container_service.KubernetesCluster):
           '--resource-group',
           self.resource_group.name,
           '--attach-acr',
-          self.container_registry_name,
+          self.container_registry.name,
       ]
       vm_util.IssueCommand(attach_registry_cmd)
     else:
