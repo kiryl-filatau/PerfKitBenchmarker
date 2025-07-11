@@ -506,7 +506,7 @@ class BaseContainerCluster(resource.BaseResource):
     )
     self.services: dict[str, KubernetesContainerService] = {}
     self._extra_samples: list[sample.Sample] = []
-    self.container_registry = None
+    self.container_registry_name = None
 
   @property
   def num_nodes(self) -> int:
@@ -601,8 +601,10 @@ class BaseContainerCluster(resource.BaseResource):
           'min_size': self.min_nodes,
       })
 
-    if self.container_registry:
-        metadata['container_registry'] = self.container_registry
+    if self.container_registry_name:
+        metadata['container_registry_name'] = self.container_registry_name
+
+    logging.info('BaseContainerCluster Metadata: %s', metadata)
 
     return metadata
 
