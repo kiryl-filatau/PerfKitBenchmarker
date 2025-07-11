@@ -326,7 +326,9 @@ class BenchmarkSpec:
     """Create the container cluster."""
     if self.config.container_cluster is None:
       return
-    self.container_registry
+    if self.config.container_cluster is None:
+        return
+    # self.container_registry
     # if hasattr(self, 'container_registry') and self.container_registry:
     #   self.resources.append(self.container_registry.name)
     #   logging.info(f"Appended container registry to resources: {self.container_registry.name}")
@@ -338,8 +340,10 @@ class BenchmarkSpec:
         cloud, cluster_type
     )
     self.container_cluster = container_cluster_class(
-        self.config.container_cluster
+        self.config.container_cluster,
+        self.container_registry
     )
+    self.resources.append(self.container_registry)
     self.resources.append(self.container_cluster)
 
     print("All attributes of ConstructContainerCluster(self):")
