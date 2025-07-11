@@ -147,6 +147,7 @@ class AksCluster(container_service.KubernetesCluster):
     self.service_principal = service_principal.ServicePrincipal.GetInstance()
     self.cluster_version = FLAGS.container_cluster_version
     self._deleted = False
+    self.container_registry_name = spec.container_registry_name
 
   def InitializeNodePoolForCloud(
       self,
@@ -322,25 +323,25 @@ class AksCluster(container_service.KubernetesCluster):
             value = getattr(self, attr)
             print(f"{attr}: {value}")
 
-    # if hasattr(self, 'container_registry') and self.container_registry:
-    #   print(
-    #       f"Attaching container registry '{self.container_registry_name}' "
-    #       f"to AKS cluster '{self.name}'."
-    #   )
-    #   attach_registry_cmd = [
-    #       azure.AZURE_PATH,
-    #       'aks',
-    #       'update',
-    #       '--name',
-    #       self.name,
-    #       '--resource-group',
-    #       self.resource_group.name,
-    #       '--attach-acr',
-    #       self.container_registry_name,
-    #   ]
-    #   vm_util.IssueCommand(attach_registry_cmd)
-    # else:
-    #     print("No container registry name defined, skipping registry attachment.")
+    if hasattr(self, 'container_registry_name') and self.container_registry_name:
+      print(
+          f"Attaching container registry '{self.container_registry_name}' "
+          f"to AKS cluster '{self.name}'."
+      )
+      attach_registry_cmd = [
+          azure.AZURE_PATH,
+          'aks',
+          'update',
+          '--name',
+          self.name,
+          '--resource-group',
+          self.resource_group.name,
+          '--attach-acr',
+          self.container_registry_name,
+      ]
+      vm_util.IssueCommand(attach_registry_cmd)
+    else:
+        print("No container registry name defined, skipping registry attachment.")
 
   def _IsReady(self):
     """Returns True if the cluster is ready."""
