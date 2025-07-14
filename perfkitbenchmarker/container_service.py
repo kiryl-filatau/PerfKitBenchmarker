@@ -1665,6 +1665,10 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
 
   def _GetAddressFromIngress(self, ingress_out: str):
     """Gets the endpoint address from the Ingress resource."""
+    if not ingress_out.strip():
+      raise errors.Benchmarks.RunError(
+          'Ingress output is empty. Check if the service is ready or jsonpath is correct.'
+      )
     ingress = json.loads(ingress_out.strip("'"))
     if 'ip' in ingress:
       ip = ingress['ip']
