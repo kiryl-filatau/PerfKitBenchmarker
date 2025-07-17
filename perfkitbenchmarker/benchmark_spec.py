@@ -337,8 +337,16 @@ class BenchmarkSpec:
         self.config.container_cluster
     )
     
+    # Debug: Check attributes and methods of the cluster instance
+    logging.debug(f"Type of container cluster: {type(self.container_cluster)}")
+    logging.debug(f"Attributes of container cluster: {dir(self.container_cluster)}")
+    logging.debug(f"Help for container cluster: {help(self.container_cluster)}")
+
     if self.container_registry:
       self.container_cluster.SetContainerRegistry(self.container_registry)
+
+    logging.debug(f"Type of container_cluster: {type(self.container_cluster)}")
+    logging.debug(f"MRO of container_cluster: {type(self.container_cluster).mro()}")
 
     self.resources.append(self.container_cluster)
 

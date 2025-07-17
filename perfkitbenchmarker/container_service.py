@@ -478,6 +478,7 @@ class BaseContainerCluster(resource.BaseResource):
   def __init__(self, cluster_spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(user_managed=bool(cluster_spec.static_cluster))
     self.name: str = cluster_spec.static_cluster or 'pkb-' + FLAGS.run_uri
+    self.container_registry: BaseContainerRegistry | None = None
     # Go get a BaseVM, to use strictly for config values.
     default_vm_class = virtual_machine.GetVmClass(
         self.CLOUD, os_types.DEFAULT, provider_info.DEFAULT_VM_PLATFORM
@@ -506,7 +507,6 @@ class BaseContainerCluster(resource.BaseResource):
     )
     self.services: dict[str, KubernetesContainerService] = {}
     self._extra_samples: list[sample.Sample] = []
-    self.container_registry: BaseContainerRegistry | None = None
 
   @property
   def num_nodes(self) -> int:
@@ -528,6 +528,17 @@ class BaseContainerCluster(resource.BaseResource):
     nodepool_config.num_nodes = cluster_spec.vm_count
     self.InitializeNodePoolForCloud(vm_config, nodepool_config)
     return nodepool_config
+  
+  def SetContainerRegistry(self, container_registry):
+    """Sets the container registry for the cluster."""
+    self.container_registry = container_registry
+    logging.info("Container registry set: %s", self.container_registry.name)
+    # if self.container_registry:
+    #     self.container_registry_name = self.container_registry.name
+    #     logging.info('Container registry name: %s', self.container_registry_name)
+    # else:
+    #     self.container_registry_name = None
+    #     logging.warning('No container registry constructed')
 
   def _InitializeNodePool(
       self,
@@ -677,18 +688,6 @@ def GetContainerClusterClass(
   return resource.GetResourceClass(
       BaseContainerCluster, CLOUD=cloud, CLUSTER_TYPE=cluster_type
   )
-
-def SetContainerRegistry(self, container_registry):
-    """Sets the container registry for the cluster."""
-    self.container_registry = container_registry
-    logging.info("Container registry set: %s", self.container_registry.name)
-    # if self.container_registry:
-    #     self.container_registry_name = self.container_registry.name
-    #     logging.info('Container registry name: %s', self.container_registry_name)
-    # else:
-    #     self.container_registry_name = None
-    #     logging.warning('No container registry constructed')
-
 
 class KubernetesPod:
   """Representation of a Kubernetes pod.
