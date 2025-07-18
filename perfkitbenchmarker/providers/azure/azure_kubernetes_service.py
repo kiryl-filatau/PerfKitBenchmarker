@@ -135,7 +135,7 @@ class AksCluster(container_service.KubernetesCluster):
 
   CLOUD = provider_info.AZURE
 
-  def __init__(self, spec, container_registry=None):
+  def __init__(self, spec):
     """Initializes the cluster."""
     super().__init__(spec)
     self.region = util.GetRegionFromZone(self.zone)
@@ -147,7 +147,7 @@ class AksCluster(container_service.KubernetesCluster):
     self.service_principal = service_principal.ServicePrincipal.GetInstance()
     self.cluster_version = FLAGS.container_cluster_version
     self._deleted = False
-    self.container_registry = container_registry
+    # self.container_registry = container_registry
 
   def InitializeNodePoolForCloud(
       self,
