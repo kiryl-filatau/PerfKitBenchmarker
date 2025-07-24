@@ -10,3 +10,5 @@
 *.iml
 /.idea
 /*git_ignore*
+/.venv
+.DS_Store
