@@ -466,7 +466,7 @@ class AksAutomaticCluster(AksCluster):
     stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
     try:
         cluster = json.loads(stdout)
-        if cluster.get('provisioningState') not in ('Succeeded', 'Updating'):
+        if cluster.get('provisioningState') != 'Succeeded':
             return False
     except Exception:
         return False
@@ -498,47 +498,6 @@ class AksAutomaticCluster(AksCluster):
     stdout, _, _ = vm_util.IssueCommand(get_cmd)
     return 'default' in stdout
   
-  def _CreateDependencies(self):
-    """Creates the resource group, service principal, and registers required AKS features."""
-    super()._CreateDependencies()
-
-    # Register the AutomaticSKUPreview feature
-    vm_util.IssueCommand(
-        [
-          azure.AZURE_PATH,
-          'feature',
-          'register',
-          '--namespace',
-          'Microsoft.ContainerService',
-          '--name',
-          'AutomaticSKUPreview',
-        ]
-    )
-
-    # Show the feature registration status
-    vm_util.IssueCommand(
-        [
-          azure.AZURE_PATH,
-          'feature',
-          'show',
-          '--namespace',
-          'Microsoft.ContainerService',
-          '--name',
-          'AutomaticSKUPreview',
-        ]
-    )
-    
-    # Register the provider
-    vm_util.IssueCommand(
-        [
-          azure.AZURE_PATH,
-          'provider',
-          'register',
-          '--namespace',
-          'Microsoft.ContainerService',
-        ]
-    )
-
   def _PostCreate(self):
     """Skip the superclass's _PostCreate() method.
     
