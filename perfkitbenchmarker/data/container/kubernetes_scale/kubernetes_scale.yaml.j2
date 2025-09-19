@@ -43,3 +43,14 @@ spec:
         operator: "Exists"
         effect: "NoExecute"
         tolerationSeconds: {{ PodTimeout }}
+      {% if cloud == 'Azure' -%}
+      # Add topology spread constraints to fix an issue with Azure AKS where
+      # admission webhook "validation.gatekeeper.sh" denied the request
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            name: {{ Name }}
+      {%- endif %}

@@ -138,6 +138,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       'pod_cpu': CPUS_PER_POD.value,
       'goal_replicas': NUM_PODS.value,
       'image': _GetImage(),
+      'cloud': FLAGS.cloud.value,
   }
   if virtual_machine.GPU_COUNT.value:
     metadata['gpu_count'] = virtual_machine.GPU_COUNT.value
