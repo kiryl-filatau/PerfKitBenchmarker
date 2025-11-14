@@ -16,22 +16,44 @@ spec:
             value: {{generate_args}}
           - name: OUTPUT_FILE
             value: /output/output.yaml
+          - name: WG_SERVING_REPO_URL
+            value: "https://github.com/vofish/wg-serving.git"
+          - name: WG_SERVING_REPO_BRANCH
+            value: "add-aks-deployment"
         volumeMounts:
         - name: output
           mountPath: /output
         resources:
           requests:
             cpu: "250m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
       containers:
       - name: sleep
         image: gcr.io/gke-release/debian-base
         command: ["sleep", "300"]
+        livenessProbe:
+          exec:
+            command:
+            - /bin/true
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/true
+          initialDelaySeconds: 3
+          periodSeconds: 5
         volumeMounts:
           - name: output
             mountPath: /output
         resources:
           requests:
             cpu: "250m"
+          limits:
+            cpu: "500m"
       restartPolicy: Never
       volumes:
       - name: output
