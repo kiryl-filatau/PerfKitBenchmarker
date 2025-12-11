@@ -90,6 +90,7 @@ def PrepareCluster(benchmark_spec: bm_spec.BenchmarkSpec, manifest_path: str):
       manifest_path,
       fib_image=fib_image,
       port=_PORT,
+      node_selectors=cluster.GetNodeSelectors(),
   )
   cluster.ModifyPodSpecPlacementYaml(
       yaml_docs,
