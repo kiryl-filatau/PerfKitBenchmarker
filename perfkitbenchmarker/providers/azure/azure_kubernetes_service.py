@@ -167,6 +167,7 @@ class AksCluster(container_service.KubernetesCluster):
         vm_util.GetPublicKeyPath(),
         '--nodepool-name',
         container_service.DEFAULT_NODEPOOL,
+        '--enable-vpa',
         '--nodepool-labels',
         f'pkb_nodepool={container_service.DEFAULT_NODEPOOL}',
     ] + self._GetNodeFlags(self.default_nodepool)

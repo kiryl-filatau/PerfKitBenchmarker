@@ -26,14 +26,14 @@ class StagesShape(locust.LoadTestShape):
   # pyformat: disable
   # pylint: disable=bad-whitespace
   _stages = [
-      {"endtime":  1*60*60, "users":   1},  #   1 rps for 1h
-      {"endtime":  4*60*60, "users":  20},  #  20 rps for 3h
-      {"endtime":  5*60*60, "users":  40},  #  40 rps for 1h
-      {"endtime":  6*60*60, "users":  60},  #  60 rps for 1h
-      {"endtime":  7*60*60, "users":  90},  #  90 rps for 1h
-      {"endtime":  9*60*60, "users": 120},  # 120 rps for 2h
-      {"endtime": 11*60*60, "users": 150},  # 150 rps for 2h
-      {"endtime": 12*60*60, "users":   1},  #   1 rps for 1h
+      {"endtime":  1*60, "users":   1},  #   1 rps for 1h
+      {"endtime":  4*60, "users":  20},  #  20 rps for 3h
+      {"endtime":  5*60, "users":  40},  #  40 rps for 1h
+      {"endtime":  6*60, "users":  60},  #  60 rps for 1h
+      {"endtime":  7*60, "users":  90},  #  90 rps for 1h
+      {"endtime":  9*60, "users": 120},  # 120 rps for 2h
+      {"endtime": 11*60, "users": 150},  # 150 rps for 2h
+      {"endtime": 12*60, "users":   1},  #   1 rps for 1h
       # --------------
       #     Total: 12h
   ]

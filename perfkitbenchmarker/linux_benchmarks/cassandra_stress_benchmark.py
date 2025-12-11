@@ -674,7 +674,7 @@ def GenerateCassandraStressCommand(
     schema_option = ''
   else:
     if command == MIXED_COMMAND:
-      command += f' ratio\({spec.mixed_ratio}\)'
+      command += f' ratio({spec.mixed_ratio})'
     schema_option = (
         r'-schema replication\(factor={replication_factor}\)'.format(
             replication_factor=spec.replication_factor
