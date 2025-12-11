@@ -476,6 +476,18 @@ class AksCluster(container_service.KubernetesCluster):
         spot=FLAGS.azure_low_priority_vms,
     )
 
+  def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
+    """Get the node selectors section of a yaml for the provider."""
+    selectors = {}
+    if self.use_spot:
+      selectors['kubernetes.azure.com/scalesetpriority'] = 'spot'
+    if virtual_machine.GPU_TYPE.value:
+      selectors['sku'] = virtual_machine.GPU_TYPE.value
+    elif machine_type:
+      selectors['beta.kubernetes.io/instance-type'] = machine_type
+
+    return selectors
+
 
 class AksAutomaticCluster(AksCluster):
   """Class representing an AKS Automatic cluster, which has managed node pools.
