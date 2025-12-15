@@ -679,12 +679,6 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           gpu_instance_families=['g6', 'g6e'],
           gpu_taint_key='nvidia.com/gpu',
       )
-    elif FLAGS.cloud == 'Azure':
-      self.cluster.ApplyManifest(
-          'container/kubernetes_ai_inference/azure-gpu-nodepool.yaml.j2',
-          gpu_capacity_types=['on-demand'],
-          gpu_sku_name=['H100'],
-      )
 
   def _ParseInferenceServerDeploymentMetadata(self) -> None:
     """Parses deployment metadata to get server details and stores them."""
