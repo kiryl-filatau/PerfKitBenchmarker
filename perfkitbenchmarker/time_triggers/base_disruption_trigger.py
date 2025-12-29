@@ -16,9 +16,10 @@
 import collections
 from collections.abc import Mapping, MutableSequence
 import copy
+import dataclasses
 import logging
 import statistics
-from typing import Any
+from typing import Any, Dict
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
@@ -32,6 +33,7 @@ TIME_SERIES_SAMPLES_FOR_AGGREGATION = [
     sample.QPS_TIME_SERIES,
 ]
 PERCENTILES = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+MS_MULTIPLIER = 1000
 
 DEGRADATION_PERCENT = flags.DEFINE_float(
     'maintenance_degradation_percent',
@@ -50,24 +52,73 @@ MAINTENANCE_DEGRADATION_WINDOW = flags.DEFINE_float(
 )
 
 
+@dataclasses.dataclass
+class DisruptionEvent:
+  start_time: float = 0.0
+  end_time: float = 0.0
+  total_time: float = 0.0
+
+
 class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
   """Class contains logic for triggering maintenance events."""
 
   def __init__(self, delay: int):
     super().__init__(delay)
-    self.disruption_ends = None
+    self.metadata = {}
+    self.disruption_events: MutableSequence[DisruptionEvent] = []
 
   def TriggerMethod(self, vm: virtual_machine.VirtualMachine):
-    """Trigger the disruption."""
+    """Trigger the disruption.
+
+    Implementation of this needs to modify the disruption_events list if the
+    operation sync.
+
+    Args:
+      vm: The VirtualMachine to trigger the disruption on.
+    """
     raise NotImplementedError()
 
   def SetUp(self):
     """See base class."""
     raise NotImplementedError()
 
-  def WaitForDisruption(self) -> MutableSequence[Mapping[str, Any]]:
-    """Wait for disruption to end and return the end time."""
-    return []
+  def WaitForDisruption(self) -> None:
+    """Wait for disruption to end and return the end time.
+
+    Only need to implement this if the operation is async. If the operation is
+    async append the events to the disruption_events list.
+    """
+    pass
+
+  def GetMetadataForTrigger(self, event: DisruptionEvent) -> Dict[str, Any]:
+    """Get the metadata for the trigger and append it to the samples."""
+    return self.metadata | {
+        'LM_total_time': event.total_time,
+        'Host_maintenance_start': event.start_time,
+        'Host_maintenance_end': event.end_time,
+    }
+
+  def _GenerateDisruptionTotalTimeSamples(
+      self, samples: MutableSequence[sample.Sample]
+  ) -> MutableSequence[sample.Sample]:
+    """Generate samples for total disruption time."""
+    # Populate the run_number "LM Total Time" by copying the metadata from
+    # (one of) the existing samples. Ideally pkb.DoRunPhase() would have sole
+    # responsibility for populating run_number for all samples, but making
+    # that change might be risky.
+    sample_metadata = (
+        copy.deepcopy(samples[0].metadata) if len(samples) > 0 else {}
+    )
+
+    return [
+        sample.Sample(
+            'LM Total Time',
+            d.total_time,
+            'seconds',
+            sample_metadata | self.GetMetadataForTrigger(d),
+        )
+        for d in self.disruption_events
+    ]
 
   def AppendSamples(
       self,
@@ -76,49 +127,26 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
       samples: MutableSequence[sample.Sample],
   ):
     """Append samples related to disruption."""
+    samples += self._GenerateDisruptionTotalTimeSamples(samples)
+    samples += self._AppendAggregatedMetrics(samples)
 
-    def generate_disruption_total_time_samples() -> (
-        MutableSequence[sample.Sample]
-    ):
-      events = self.WaitForDisruption()
-
-      # Host maintenance is in s
-      self.disruption_ends = max(
-          [float(d['Host_maintenance_end']) * 1000 for d in events],
-          default=0,
-      )
-
-      # Populate the run_number "LM Total Time" by copying the metadata from
-      # (one of) the existing samples. Ideally pkb.DoRunPhase() would have sole
-      # responsibility for populating run_number for all samples, but making
-      # that change might be risky.
-      sample_metadata = (
-          copy.deepcopy(samples[0].metadata) if len(samples) > 0 else {}
-      )
-
-      return [
-          sample.Sample(
-              'LM Total Time',
-              d['LM_total_time'],
-              'seconds',
-              sample_metadata | d,
-          )
-          for d in events
-      ]
-
-    samples += generate_disruption_total_time_samples()
-    self._AppendAggregatedMetrics(samples)
-
-  def _AppendAggregatedMetrics(self, samples: MutableSequence[sample.Sample]):
+  def _AppendAggregatedMetrics(
+      self, samples: MutableSequence[sample.Sample]
+  ) -> MutableSequence[sample.Sample]:
     """Finds the time series samples and add generate the aggregated metrics."""
     additional_samples = []
     for s in samples:
       if s.metric in TIME_SERIES_SAMPLES_FOR_AGGREGATION:
-        additional_samples += self._AggregateThroughputSample(s)
-    samples += additional_samples
+        for disruption_event in self.disruption_events:
+          additional_samples += self._AggregateThroughputSample(
+              s, disruption_event
+          )
+    return additional_samples
 
   def _AggregateThroughputSample(
-      self, s: sample.Sample
+      self,
+      s: sample.Sample,
+      disruption_event: DisruptionEvent,
   ) -> MutableSequence[sample.Sample]:
     """Aggregate a time series sample into disruption metrics.
 
@@ -127,6 +155,7 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
 
     Args:
       s: A time series sample create using CreateTimeSeriesSample in samples.py
+      disruption_event: The DisruptionEvent being aggregated.
 
     Returns:
       A list of samples.
@@ -140,7 +169,7 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
     # provide it in the metadata.
     ramp_up_ends = time_series[0]
     ramp_down_starts = time_series[-1]
-    disruption_ends = self.GetDisruptionEnds()
+    disruption_ends = disruption_event.end_time * MS_MULTIPLIER
     if disruption_ends is None:
       disruption_ends = time_series[-1]
     if sample.RAMP_DOWN_STARTS in metadata:
@@ -163,7 +192,7 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
         # If more than 1 sequential value is missing from the time series.
         # Distrubute the ops throughout the time series
         if i > 0:
-          time_gap_in_seconds = (time - time_series[i - 1]) / 1000
+          time_gap_in_seconds = (time - time_series[i - 1]) / MS_MULTIPLIER
           missing_entry_count = int((time_gap_in_seconds / interval) - 1)
           if missing_entry_count > 1:
             total_missing_seconds += missing_entry_count * interval
@@ -231,10 +260,6 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
         )
     )
     return samples
-
-  def GetDisruptionEnds(self) -> float | None:
-    """Get the disruption ends."""
-    return self.disruption_ends
 
   def _ComputeLossPercentile(
       self,

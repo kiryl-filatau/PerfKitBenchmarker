@@ -32,7 +32,6 @@ kubernetes_ai_inference:
     inference_server:
       model_server: vllm
       model_name: llama3-8b
-      catalog_provider: gke
       catalog_components: 1-L4
       hpa_max_replicas: 10
       extra_deployment_args:
@@ -119,7 +118,9 @@ def Run(
   cluster: container_service.KubernetesCluster = (
       benchmark_spec.container_cluster
   )
-  server: k8s_server.WGServingInferenceServer = cluster.inference_server
+  server: kubernetes_inference_server.BaseKubernetesInferenceServer | None = (
+      cluster.inference_server
+  )
   if not server or not isinstance(server, k8s_server.WGServingInferenceServer):
     raise ValueError('Inference server is not initialized in the cluster.')
 

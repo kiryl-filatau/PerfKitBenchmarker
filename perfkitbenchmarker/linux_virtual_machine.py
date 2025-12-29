@@ -1200,11 +1200,13 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     self.os_metadata['kernel_release'] = str(self.kernel_release)
     self.os_metadata['cpu_arch'] = self.cpu_arch
     self.os_metadata.update(self.partition_table)
+    self.os_metadata['kernel_command_line'] = self.kernel_command_line
     if FLAGS.append_kernel_command_line:
-      self.os_metadata['kernel_command_line'] = self.kernel_command_line
       self.os_metadata['append_kernel_command_line'] = (
           FLAGS.append_kernel_command_line
       )
+    if _ENABLE_RT_KERNEL.value:
+      self.os_metadata['enable_rt_kernel'] = True
     # TODO(pclay): consider publishing full lsmod as a sample. It's probably too
     # spammy for metadata
     if _KERNEL_MODULES_TO_ADD.value:
@@ -2803,11 +2805,13 @@ class BaseRedHatMixin(BaseLinuxMixin):
       self.Reboot()
 
 
-class AmazonLinux2Mixin(BaseRedHatMixin):
+class AmazonLinux2Mixin(BaseRedHatMixin, os_mixin.DeprecatedOsMixin):
   """Class holding Amazon Linux 2 VM methods and attributes."""
 
   OS_TYPE = os_types.AMAZONLINUX2
   PACKAGE_MANAGER = YUM
+  ALTERNATIVE_OS = os_types.AMAZONLINUX2023
+  END_OF_LIFE = '2026-07-01'
 
   def SetupPackageManager(self):
     """Install EPEL."""

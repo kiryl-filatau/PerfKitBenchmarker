@@ -60,7 +60,7 @@ flags.DEFINE_bool(
 )
 flag_util.DEFINE_integerlist(
     'netperf_num_streams',
-    flag_util.IntegerList([1, 200]),
+    flag_util.IntegerList([1]),
     'Number of netperf processes to run. Netperf '
     'will run once for each value in the list.',
     module_name=__name__,
@@ -765,7 +765,9 @@ def RunClientServerVMs(client_vm, server_vm):
             netperf_benchmark,
             [server_vm.ip_address],
             num_streams,
-            [client_vm.ip_address],
+            # NAT translates internal to external IP when remote server IP is
+            # external.
+            [client_vm.GetInternalIPs()[0]],
         )
         for external_ip_result in external_ip_results:
           external_ip_result.metadata['ip_type'] = (

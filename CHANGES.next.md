@@ -257,7 +257,6 @@
 -   Add support for the `--addons` flag in GKE Standard.
 -   Add support for RHEL and Rocky Linux 10.
 -   Add support for Debian 13.
--   Add KVRocks memtier benchmark with LSSD support.
 
 ### Enhancements:
 
@@ -432,6 +431,7 @@
 -   Add support for NVMe local SSDs in GKE.
 -   Add support for cluster to wait the resource on multiple conditions
 -   Add support for enabling live migration on AMD SEV
+-   Increased maintenance simulation notification timeout to 4 hours in maintenance_simulation_trigger.py.
 
 ### Bug fixes and maintenance updates:
 
@@ -635,3 +635,4 @@
 -   Add fio benchmark for object storage via FUSE.
 -   Updated the CONTRIBUTING.md guide with steps to minimize merging & review
     friction for new PRs.
+-   Support gs:// URLs in --ycsb_tar_url.

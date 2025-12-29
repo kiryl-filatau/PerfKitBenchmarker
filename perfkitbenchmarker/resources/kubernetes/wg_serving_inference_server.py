@@ -599,6 +599,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       storage_service = object_storage_service.GetObjectStorageClass(
           FLAGS.cloud
       )()
+      storage_service.PrepareService(self.cluster.region)
       storage_service.Copy(self.huggingface_token, secret_file_path)
 
       with open(secret_file_path, mode='r+') as secret_file:
@@ -619,11 +620,14 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
   def _GetInferenceServerManifest(self) -> str:
     """Generates and retrieves the inference server manifest content."""
+    provider = self.spec.cloud.lower()
+    if provider == 'gcp':
+      provider = 'gke'
     generate_args = {
         'kind': 'core/deployment',
         'model-server': self.spec.model_server,
         'model': self.spec.model_name,
-        'provider': self.spec.catalog_provider,
+        'provider': provider,
         'components': self.spec.catalog_components,
         **self.spec.extra_deployment_args,
     }
@@ -678,6 +682,12 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           gpu_arch=['amd64'],
           gpu_instance_families=['g6', 'g6e'],
           gpu_taint_key='nvidia.com/gpu',
+      )
+    elif FLAGS.cloud == 'Azure':
+      self.cluster.ApplyManifest(
+          'container/kubernetes_ai_inference/azure-gpu-nodepool.yaml.j2',
+          gpu_capacity_types=['on-demand'],
+          gpu_sku_name=[self.accelerator_type],
       )
 
   def _ParseInferenceServerDeploymentMetadata(self) -> None:
@@ -956,7 +966,31 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
     logging.info('Creating new inference server')
     self._InjectDefaultHuggingfaceToken()
-    inference_server_manifest = self._GetInferenceServerManifest()
+
+    # Define Safeguard policy error patterns
+    safeguard_policy_errors = [
+        'admission webhook "validation.gatekeeper.sh" denied',
+        'azurepolicy-k8sazurev',
+    ]
+
+    # Apply the manifest with retry logic,
+    # waiting for the Safeguard policy relaxation to take effect.
+    @vm_util.Retry(
+        poll_interval=30, retryable_exceptions=errors.Resource.CreationError
+    )
+    def _apply_manifest_with_retry():
+      """Apply inference server manifest with retry logic."""
+      logging.info('Applying inference server manifest')
+      try:
+        return self._GetInferenceServerManifest()
+      except Exception as e:
+        # Only retry Safeguard policy errors, fail fast on others
+        if any(pattern in str(e) for pattern in safeguard_policy_errors):
+          raise errors.Resource.CreationError(str(e))
+        raise
+
+    inference_server_manifest = _apply_manifest_with_retry()
+
     self._ParseAndStoreInferenceServerDetails(inference_server_manifest)
     with vm_util.NamedTemporaryFile(
         mode='w', prefix='inference-server-manifest', suffix='.yaml'

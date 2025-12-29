@@ -13,15 +13,17 @@
 # limitations under the License.
 
 """Module containing Benchbase installation and cleanup functions."""
-# TODO(shuninglin): Add result parsing functions
 
+import json
 import logging
 import os
+from typing import Any
 
 from absl import flags
 import jinja2
 from perfkitbenchmarker import data as pkb_data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine
 
@@ -69,7 +71,7 @@ _BENCHBASE_TXN_WEIGHTS = flags.DEFINE_list(
         ' Delivery, StockLevel).'
     ),
 )
-_BENCHBASE_WAREHOUSES = flags.DEFINE_integer(
+BENCHBASE_WAREHOUSES = flags.DEFINE_integer(
     'benchbase_warehouses',
     default=10000,
     help=(
@@ -77,20 +79,20 @@ _BENCHBASE_WAREHOUSES = flags.DEFINE_integer(
         ' 1TB).'
     ),
 )
-_BENCHBASE_WARMUP_DURATION = flags.DEFINE_integer(
+BENCHBASE_WARMUP_DURATION = flags.DEFINE_integer(
     'benchbase_warmup_duration',
     default=30,
-    help='Warmup duration for the run phase, in minutes.',
+    help='Warmup phase duration, in minutes.',
 )
-_BENCHBASE_WORKLOAD_DURATION = flags.DEFINE_integer(
+BENCHBASE_WORKLOAD_DURATION = flags.DEFINE_integer(
     'benchbase_workload_duration',
     default=30,
     help='Main workload execution duration, in minutes.',
 )
-_BENCHBASE_COOLDOWN_DURATION = flags.DEFINE_integer(
+BENCHBASE_COOLDOWN_DURATION = flags.DEFINE_integer(
     'benchbase_cooldown_duration',
     default=60,
-    help='Cooldown duration after the run phase, in minutes.',
+    help='Cooldown duration after the warmup phase, in minutes.',
 )
 _BENCHBASE_ISOLATION = flags.DEFINE_enum(
     'benchbase_isolation',
@@ -169,20 +171,20 @@ def CreateConfigFile(vm: virtual_machine.BaseVirtualMachine) -> None:
       'driver_class': 'org.postgresql.Driver',
       'jdbc_url': _GetJdbcUrl(),
       'isolation': _BENCHBASE_ISOLATION.value,
-      'scalefactor': _BENCHBASE_WAREHOUSES.value,
+      'scalefactor': BENCHBASE_WAREHOUSES.value,
       'terminals': _BENCHBASE_THREAD_COUNT.value,
       'workload_duration_seconds': (
-          _BENCHBASE_WORKLOAD_DURATION.value * _SECONDS_IN_MINUTE
+          BENCHBASE_WORKLOAD_DURATION.value * _SECONDS_IN_MINUTE
       ),
       'weights': ','.join(_BENCHBASE_TXN_WEIGHTS.value),
   }
 
   if db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
     context['db_type'] = 'AURORADSQL'
-    # For DSQL we use automatic username and password generation so comment out
-    # the username and password elements.
-    context['username_element'] = '<!--<username>admin</username>-->'
-    context['password_element'] = '<!--<password>password</password>-->'
+    # Following guide here to use automatic username and password generation:
+    # https://github.com/amazon-contributing/aurora-dsql-benchbase-benchmarking/wiki#loading-data-and-running-tpc-c-against-an-aurora-dsql-cluster
+    context['username_element'] = '<username>admin</username>'
+    context['password_element'] = '<password></password>'
   else:  # spanner by default
     context['db_type'] = 'POSTGRES'
     context['username_element'] = '<username>admin</username>'
@@ -207,6 +209,94 @@ def CreateConfigFile(vm: virtual_machine.BaseVirtualMachine) -> None:
   except jinja2.TemplateError as e:
     logging.exception('Error rendering template: %s', e)
     return
+
+
+def ParseResults(
+    vm: virtual_machine.BaseVirtualMachine, metadata: dict[str, Any]
+) -> list[sample.Sample]:
+  """Parses the latest benchbase result file and returns metrics.
+
+  Args:
+    vm: The virtual machine to parse results from.
+    metadata: The metadata to attach to the samples.
+
+  Returns:
+    A list of sample.Sample objects.
+
+  Raises:
+    errors.Benchmarks.RunError: If the result file is not found or cannot be
+      parsed.
+  """
+  stdout, _ = vm.RemoteCommand(
+      f'ls -t {BENCHBASE_DIR}/results/tpcc*summary.json | head -n 1'
+  )
+  result_file = stdout.strip()
+  if not result_file:
+    raise errors.Benchmarks.RunError('Benchbase result file not found.')
+  stdout, _ = vm.RemoteCommand(f'cat {result_file}')
+  try:
+    results = json.loads(stdout)
+  except json.JSONDecodeError as e:
+    raise errors.Benchmarks.RunError(
+        f'Error parsing benchbase result file {result_file}: {e}'
+    ) from e
+  samples: list[sample.Sample] = []
+  latency_metrics = results.get('Latency Distribution', {})
+  if not latency_metrics:
+    raise errors.Benchmarks.RunError(
+        'Latency Distribution not found in benchbase result file.'
+    )
+  for key, value in latency_metrics.items():
+    metric_name = (
+        key.replace('(microseconds)', '').strip().replace(' ', '_').lower()
+    )
+    samples.append(sample.Sample(metric_name, value / 1000, 'ms', metadata))
+
+  if 'Throughput (requests/second)' in results:
+    throughput = results['Throughput (requests/second)']
+    samples.append(
+        sample.Sample(
+            'tps',
+            throughput,
+            'tps',
+            metadata,
+        )
+    )
+    tpmc = throughput * int(_BENCHBASE_TXN_WEIGHTS.value[0]) / 100.0 * 60.0
+    samples.append(sample.Sample('tpmc', tpmc, 'tpm', metadata))
+  else:
+    raise errors.Benchmarks.RunError(
+        'Throughput (requests/second) not found in benchbase result file.'
+    )
+  return samples
+
+
+def UpdateTime(
+    vm: virtual_machine.BaseVirtualMachine, time_in_minutes: int
+) -> None:
+  """Updates the time in configuration.
+
+  Args:
+    vm: The client virtual machine to create the file on.
+    time_in_minutes: The time in minutes to set in the config file.
+  """
+  time_in_seconds = time_in_minutes * _SECONDS_IN_MINUTE
+  vm.RemoteCommand(
+      f"sed -i 's|<time>.*</time>|<time>{time_in_seconds}</time>|'"
+      f' {CONFIG_FILE_PATH}'
+  )
+
+
+def OverrideEndpoint(
+    vm: virtual_machine.BaseVirtualMachine, endpoint: str
+) -> None:
+  """Overrides the endpoint in the Benchbase XML configuration file on the client VM.
+
+  Args:
+    vm: The client virtual machine to create the file on.
+    endpoint: The endpoint of the database.
+  """
+  vm.RemoteCommand(f"sed -i 's/localhost/{endpoint}/g' {CONFIG_FILE_PATH}")
 
 
 def Uninstall(vm: virtual_machine.BaseVirtualMachine) -> None:

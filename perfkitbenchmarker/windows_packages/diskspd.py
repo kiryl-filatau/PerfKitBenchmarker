@@ -319,7 +319,7 @@ def _GenerateDiskspdConfig(outstanding_io, threads):
     throughput_per_ms_string = '-g' + str(FLAGS.diskspd_throughput_per_ms)
 
   diskspd_file_size = ''
-  if DISKSPD_PREFILL_DURATION.value is None:
+  if not EnablePrefill():
     # -c in diskspd creates file. If prefill duration is set, we need to use the
     # already created file from the prefill stage.
     diskspd_file_size = f'-c{FLAGS.diskspd_file_size}'
@@ -487,8 +487,9 @@ def Prefill(running_vm):
 
 
 def RunDiskspdPrefillCommandForDuration(vm, diskspd_exe_dir, prefill_duration):
+  # using -si so that all the threads share the same offset and don't overlap.
   diskspd_options = (
-      f'-c{FLAGS.diskspd_file_size} -t16 -w100'
+      f'-c{FLAGS.diskspd_file_size} -t16 -w100 -si'
       f' -b{DISKSPD_PREFILL_BLOCK_SIZE.value} -d{prefill_duration} -Rxml -Sh'
       f' -o16 -Zr C:\\scratch\\{DISKSPD_TMPFILE} > {DISKSPD_XMLFILE}'
   )

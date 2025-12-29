@@ -19,11 +19,14 @@ postgres databases using the Benchbase(https://github.com/cmu-db/benchbase)
 framework.
 """
 
+import logging
+import time
 from typing import Any, Dict, List
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.linux_packages import benchbase
@@ -64,6 +67,12 @@ benchbase:
 """
 
 FLAGS = flags.FLAGS
+_SECONDS_IN_MINUTE = 60
+_COOLDOWN_DURATION = benchbase.BENCHBASE_COOLDOWN_DURATION
+_WARMUP_DURATION = benchbase.BENCHBASE_WARMUP_DURATION
+_WORKLOAD_DURATION = benchbase.BENCHBASE_WORKLOAD_DURATION
+_WAREHOUSES = benchbase.BENCHBASE_WAREHOUSES
+_RECOVERY_POINT_ARN = aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -75,11 +84,15 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   Returns:
     loaded benchmark configuration
   """
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if _COOLDOWN_DURATION.value > 0 and _WARMUP_DURATION.value <= 0:
+    raise errors.Config.InvalidValue(
+        'benchbase_warmup_duration must be positive if'
+        ' benchbase_cooldown_duration is positive.'
+    )
+  return config
 
 
-# TODO(shuninglin): need to implement auth logic(automatic password gen)
-# for DSQL
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """Prepares the benchmark by installing BenchBase and loading data.
 
@@ -96,18 +109,38 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
   # Create the configuration file on the client VM
   benchbase.CreateConfigFile(client_vm)
-  profile: str = (
-      'postgres'
-      if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES
-      else 'auroradsql'
+
+  if FLAGS.db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
+    dsql: aws_aurora_dsql_db.AwsAuroraDsqlRelationalDb = (
+        benchmark_spec.relational_db
+    )
+    # Ideally we want to use endpoint from get-cluster command but it's not
+    # returning endpoint as documented. That said this hard-coded endpoint
+    # construction is also documented so should be reliable.
+    # https://docs.aws.amazon.com/aurora-dsql/latest/userguide/SECTION_authentication-token.html#authentication-token-cli
+    endpoint: str = f'{dsql.cluster_id}.dsql.{dsql.region}.on.aws'
+    benchbase.OverrideEndpoint(client_vm, endpoint)
+
+  dsql_create_from_raw: bool = (
+      FLAGS.db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES
+      and _RECOVERY_POINT_ARN.value is None
   )
-  load_command: str = (
-      f'source /etc/profile.d/maven.sh && cd {benchbase.BENCHBASE_DIR} && mvn'
-      f' clean compile exec:java -P {profile} -Dexec.args="-b tpcc -c'
-      f' {benchbase.CONFIG_FILE_NAME} --create=true --load=true'
-      ' --execute=false"'
-  )
-  client_vm.RemoteCommand(load_command)
+  if (
+      dsql_create_from_raw
+      or FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES
+  ):
+    profile: str = (
+        'postgres'
+        if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES
+        else 'auroradsql'
+    )
+    load_command: str = (
+        f'source /etc/profile.d/maven.sh && cd {benchbase.BENCHBASE_DIR} && mvn'
+        f' clean compile exec:java -P {profile} -Dexec.args="-b tpcc -c'
+        f' {benchbase.CONFIG_FILE_NAME} --create=true --load=true'
+        ' --execute=false"'
+    )
+    client_vm.RemoteCommand(load_command)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
@@ -125,19 +158,34 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
       if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES
       else 'auroradsql'
   )
-  # TODO(shuninglin): implement the three-phase warmup run - cool down - formal
-  # run, right now it's just one run
   run_command: str = (
       f'source /etc/profile.d/maven.sh && cd {benchbase.BENCHBASE_DIR} && mvn'
       f' clean compile exec:java -P {profile} -Dexec.args="-b tpcc -c'
       f' {benchbase.CONFIG_FILE_NAME} --create=false --load=false'
       ' --execute=true"'
   )
-  client_vm.RemoteCommand(run_command)
-  # TODO(shuninglin): Parse results from the output files
+  if _WARMUP_DURATION.value > 0:
+    benchbase.UpdateTime(client_vm, _WARMUP_DURATION.value)
+    logging.info(
+        'Running benchbase warmup for %d minutes',
+        _WARMUP_DURATION.value,
+    )
+    client_vm.RemoteCommand(run_command)
+    if _COOLDOWN_DURATION.value > 0:
+      logging.info(
+          'Running benchbase cooldown for %d minutes',
+          _COOLDOWN_DURATION.value,
+      )
+      time.sleep(_COOLDOWN_DURATION.value * _SECONDS_IN_MINUTE)
+    benchbase.UpdateTime(client_vm, _WORKLOAD_DURATION.value)
 
-  samples: List[sample.Sample] = []
-  return samples
+  logging.info(
+      'Running benchbase workload for %d minutes',
+      _WORKLOAD_DURATION.value,
+  )
+  client_vm.RemoteCommand(run_command)
+  metadata = benchmark_spec.relational_db.GetResourceMetadata()
+  return benchbase.ParseResults(client_vm, metadata)
 
 
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
