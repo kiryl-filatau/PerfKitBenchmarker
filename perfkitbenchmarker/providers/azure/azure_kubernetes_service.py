@@ -178,6 +178,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         '--location',
         self.region,
         '--enable-managed-identity',
+        '--enable-blob-driver',
         '--ssh-key-value',
         vm_util.GetPublicKeyPath(),
         '--nodepool-name',

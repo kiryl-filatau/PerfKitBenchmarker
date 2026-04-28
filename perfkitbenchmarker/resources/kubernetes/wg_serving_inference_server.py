@@ -55,6 +55,37 @@ FLAG_GCS_BUCKET = flags.DEFINE_string(
     'The GCS bucket that has model data for inference server to use.',
 )
 
+FLAG_AZURE_BLOB_STORAGE_ACCOUNT = flags.DEFINE_string(
+    'k8s_inference_server_azure_blob_storage_account',
+    None,
+    'Azure Storage account name for the AKS Blob CSI driver (fuse / BlobFuse2). '
+    'Required when catalog_components includes blobfuse2. Align '
+    'extra_deployment_args PVC_NAME with the provisioned claim name '
+    'blob-fuse-csi-static-pvc unless you customize templates.',
+)
+
+FLAG_AZURE_BLOB_CONTAINER = flags.DEFINE_string(
+    'k8s_inference_server_azure_blob_container',
+    None,
+    'Azure Blob container name for model data. Required when '
+    'catalog_components includes blobfuse2.',
+)
+
+FLAG_AZURE_BLOB_RESOURCE_GROUP = flags.DEFINE_string(
+    'k8s_inference_server_azure_blob_resource_group',
+    None,
+    'Resource group of the storage account (used to fetch the account key). '
+    'If unset, the Azure CLI must resolve the account uniquely in the '
+    'subscription.',
+)
+
+FLAG_AZURE_BLOB_SECRET_NAME = flags.DEFINE_string(
+    'k8s_inference_server_azure_blob_secret_name',
+    'blob-fuse-csi-secret',
+    'Kubernetes Secret name in the default namespace for Blob CSI '
+    'nodeStageSecretRef (azurestorageaccountname / azurestorageaccountkey).',
+)
+
 WG_SERVING_REPO_URL = flags.DEFINE_string(
     'wg_serving_repo_url',
     'https://github.com/kubernetes-sigs/wg-serving',
@@ -601,9 +632,28 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
   def GetStorageType(self) -> str:
     """Returns the storage type of the inference server."""
-    if 'gcsfuse' in self.spec.catalog_components:
+    if FLAGS.cloud == 'GCP' and 'gcsfuse' in self.spec.catalog_components:
       return 'gcsfuse'
+    if FLAGS.cloud == 'Azure' and 'blobfuse2' in self.spec.catalog_components:
+      return 'blobfuse2'
     return 'huggingface'
+
+  def _ValidateFuseCatalogVersusCloud(self) -> None:
+    """Ensures fuse-related catalog tokens match the target cloud."""
+    cc = self.spec.catalog_components
+    if 'gcsfuse' in cc and FLAGS.cloud != 'GCP':
+      raise errors.Resource.CreationError(
+          'catalog_components includes gcsfuse; use --cloud=GCP for GCS Fuse.'
+      )
+    if 'blobfuse2' in cc and FLAGS.cloud != 'Azure':
+      raise errors.Resource.CreationError(
+          'catalog_components includes blobfuse2; use --cloud=Azure for Azure '
+          'Blob CSI (fuse).'
+      )
+    if 'gcsfuse' in cc and 'blobfuse2' in cc:
+      raise errors.Resource.CreationError(
+          'catalog_components cannot include both gcsfuse and blobfuse2.'
+      )
 
   def _GetAcceleratorComponent(self) -> str:
     """Returns the accelerator component of the inference server."""
@@ -1012,8 +1062,11 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       self._ParseInferenceServerDeploymentMetadata()
       return
 
-    if 'gcsfuse' in self.spec.catalog_components:
+    self._ValidateFuseCatalogVersusCloud()
+    if FLAGS.cloud == 'GCP' and 'gcsfuse' in self.spec.catalog_components:
       self._ApplyGCSFusePVC()
+    elif FLAGS.cloud == 'Azure' and 'blobfuse2' in self.spec.catalog_components:
+      self._ApplyAzureBlobFusePVC()
 
     self._ProvisionGPUNodePool()
 
@@ -1078,6 +1131,43 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         gcs_bucket=FLAG_GCS_BUCKET.value,
     )
     logging.info('Successfully applied GCSFuse PVC.')
+
+  def _ApplyAzureBlobFusePVC(self) -> None:
+    """Apply Secret, PV and PVC for Azure Blob CSI (fuse / BlobFuse2)."""
+    from perfkitbenchmarker.providers.azure import util as azure_util
+
+    account = FLAG_AZURE_BLOB_STORAGE_ACCOUNT.value
+    container = FLAG_AZURE_BLOB_CONTAINER.value
+    if not account or not container:
+      raise errors.Resource.CreationError(
+          'Azure blob storage account and container are required for BlobFuse2 '
+          'PVC (--k8s_inference_server_azure_blob_storage_account / '
+          '--k8s_inference_server_azure_blob_container).'
+      )
+    rg_args = []
+    if FLAG_AZURE_BLOB_RESOURCE_GROUP.value:
+      rg_args = ['--resource-group', FLAG_AZURE_BLOB_RESOURCE_GROUP.value]
+    account_key = azure_util.GetAzureStorageAccountKey(account, rg_args)
+    secret_name = FLAG_AZURE_BLOB_SECRET_NAME.value
+    volume_handle = f'{account}_{container}'.replace('/', '-')
+    encode_account_name = base64.b64encode(account.encode('utf-8')).decode(
+        'ascii'
+    )
+    encode_account_key = base64.b64encode(account_key.encode('utf-8')).decode(
+        'ascii'
+    )
+    rg = FLAG_AZURE_BLOB_RESOURCE_GROUP.value or ''
+    kubernetes_commands.ApplyManifest(
+        'container/kubernetes_ai_inference/azurefuse_pv_pvc.yaml.j2',
+        secret_name=secret_name,
+        encode_account_name=encode_account_name,
+        encode_account_key=encode_account_key,
+        volume_handle=volume_handle,
+        storage_account=account,
+        container_name=container,
+        resource_group=rg,
+    )
+    logging.info('Successfully applied Azure Blob (fuse) Secret and PVC.')
 
   def _CollectStartupMonitorMetrics(self) -> dict[str, PodStartupMetrics]:
     collected_metrics_map = super()._CollectStartupMonitorMetrics()

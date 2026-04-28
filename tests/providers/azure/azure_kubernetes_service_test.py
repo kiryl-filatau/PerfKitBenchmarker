@@ -100,6 +100,7 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
                 '--location',
                 'westus2',
                 '--enable-managed-identity',
+                '--enable-blob-driver',
                 '--ssh-key-value',
                 'test_key_path',
                 '--nodepool-name',

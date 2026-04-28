@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ secret_name }}
+  namespace: default
+type: Opaque
+data:
+  azurestorageaccountname: {{ encode_account_name }}
+  azurestorageaccountkey: {{ encode_account_key }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: blob-fuse-csi-static-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: azureblob-fuse-premium
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: blob-fuse-csi-pv
+spec:
+  accessModes:
+    - ReadWriteMany
+  capacity:
+    storage: 5Gi
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: azureblob-fuse-premium
+  mountOptions:
+    - -o allow_other
+    - --file-cache-timeout-in-seconds=120
+  csi:
+    driver: blob.csi.azure.com
+    readOnly: false
+    volumeHandle: {{ volume_handle }}
+    nodeStageSecretRef:
+      name: {{ secret_name }}
+      namespace: default
+    volumeAttributes:
+      protocol: fuse
+      containerName: {{ container_name }}
+      storageAccount: {{ storage_account }}
+{% if resource_group %}
+      resourceGroup: {{ resource_group }}
+{% endif %}
+  claimRef:
+    name: blob-fuse-csi-static-pvc
+    namespace: default
